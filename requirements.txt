@@ -1,0 +1,10 @@
+opencv-python
+numpy
+matplotlib
+customtkinter
+pillow
+
+# PyTorch with CUDA 12.1
+--extra-index-url https://download.pytorch.org/whl/cu130
+torch==2.9.0+cu130
+torchvision==0.24.0+cu130

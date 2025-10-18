@@ -1,0 +1,13 @@
+{
+  "classes": {
+    "0": "Meadow",
+    "1": "Woods",
+    "2": "Farmland",
+    "3": "Desert",
+    "4": "Mine",
+    "5": "Ocean",
+    "6": "Crown",
+    "7": "Castle",
+    "8": "None"
+  }
+}

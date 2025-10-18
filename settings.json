@@ -1,0 +1,24 @@
+{
+  "board": {
+    "base_file_path": "boards/cropped",
+    "width": 5,
+    "height": 5,
+    "tile_margin": 10
+  },
+  "training": {
+    "batch_size": 32,
+    "initial_epochs": 30,
+    "retrain_epochs": 10,
+    "retrain_interval": 10,
+    "learning_rate": 0.001
+  },
+  "model": {
+    "image_size": 224,
+    "max_crowns": 3
+  },
+  "paths": {
+    "labels_file": "src/board_labels.json",
+    "classes_file": "src/train/classes.json",
+    "model_dir": "src/train/models"
+  }
+}
