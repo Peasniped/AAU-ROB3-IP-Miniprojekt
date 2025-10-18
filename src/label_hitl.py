@@ -1,3 +1,4 @@
+from pathlib import Path
 import cv2
 import torch
 import json
@@ -10,11 +11,13 @@ if __name__ == "__main__":
     
     if torch.cuda.is_available():
         print(f"GPU: {torch.cuda._get_device(0)}")
-    
-    # First, validate the labels file
-    print("\n=== Validating Labels ===")
-    with open("src/board_labels.json", "r") as f:
-        labels = json.load(f)
+
+    file = Path("src/board_labels.json")
+    if file.exists():    
+        with open(file, "r") as f:
+            labels = json.load(f)
+    else:
+        labels = {}
     
     max_tile_class = -1
     max_crown_count = -1

@@ -11,6 +11,8 @@ from pathlib import Path
 from components.board import Board
 from multitask_classifier import MultiTaskTileClassifier
 from train.ctk_gui_labeller import CTkGUILabeller
+import tkinter as tk
+from tkinter import messagebox
 
 # Load settings
 _settings_path = Path(__file__).parent.parent.parent / "settings.json"
@@ -253,6 +255,56 @@ class AutoLabeller:
         torch.save(self.model.state_dict(), model_path)
         print(f"\n✓ Model saved to {model_path}")
     
+    def _show_training_prompt(self):
+        """Show a dialog asking if user wants to train the model now"""
+        root = tk.Tk()
+        root.withdraw()  # Hide the main window
+        
+        result = messagebox.askyesno(
+            "Train Model",
+            f"You have labeled {len(self.labels)} boards.\n\n"
+            "Do you want to train the model now?\n\n"
+            "This will enable automatic predictions for remaining boards."
+        )
+        
+        root.destroy()
+        return result
+    
+    def _show_retrain_prompt(self):
+        """Show a dialog asking if user wants to retrain and with how many epochs"""
+        root = tk.Tk()
+        root.withdraw()
+        
+        # First ask if they want to retrain
+        retrain = messagebox.askyesno(
+            "Retrain Model",
+            "Time to retrain the model with newly labeled boards.\n\n"
+            "Do you want to retrain now?\n\n"
+            "Training improves prediction accuracy for remaining boards."
+        )
+        
+        if not retrain:
+            root.destroy()
+            return False, 0
+        
+        # Ask about epochs
+        result = messagebox.askyesnocancel(
+            "Training Epochs",
+            f"Choose training duration:\n\n"
+            f"YES = Full training ({_SETTINGS['training']['retrain_epochs']} epochs)\n"
+            f"NO = Quick training ({_SETTINGS['training']['retrain_epochs'] // 2} epochs)\n"
+            f"CANCEL = Skip retraining"
+        )
+        
+        root.destroy()
+        
+        if result is None:  # Cancel
+            return False, 0
+        elif result:  # Yes - full epochs
+            return True, _SETTINGS['training']['retrain_epochs']
+        else:  # No - reduced epochs
+            return True, max(1, _SETTINGS['training']['retrain_epochs'] // 2)
+    
     def predict_board(self, board_idx):
         """Predict labels for a board using trained model"""
         if self.model is None:
@@ -330,20 +382,37 @@ class AutoLabeller:
         
         return vis_image
     
-    def review_and_correct_board(self, board_idx):
-        """Show predictions and allow corrections using GUI"""
-        print(f"\n=== Reviewing Board {board_idx} ===")
+    def review_and_correct_board(self, board_idx, predictions=None):
+        """Show predictions and allow corrections using GUI
         
-        board, predictions = self.predict_board(board_idx)
+        Args:
+            board_idx: Index of the board to review
+            predictions: Optional predictions dict. If None, opens GUI for manual labeling
+        """
+        print(f"\n=== {'Reviewing' if predictions else 'Manually Labeling'} Board {board_idx} ===")
+        
+        board = Board(int(board_idx))
+        
+        # If no predictions, create empty predictions dict for manual labeling
+        if predictions is None:
+            predictions = {}
+            for tile in board.tiles:
+                predictions[tile.index] = {
+                    "tile_class": 0,  # Default to first class
+                    "tile_class_conf": 0.0,
+                    "crown_count": 0,
+                    "crown_count_conf": 0.0,
+                    "col": tile.col,
+                    "row": tile.row
+                }
         
         # Use CustomTkinter GUI labeller for review
         gui = CTkGUILabeller(board, predictions, self.tile_classes, self.max_crowns)
         board_labels = gui.run()
         
         if board_labels is None:
-            # User cancelled, fall back to manual labeling
-            print("Falling back to manual labeling...")
-            self.manual_label_board(board_idx)
+            # User cancelled
+            print("User cancelled labeling.")
             return False
         
         # Save the labels
@@ -352,13 +421,14 @@ class AutoLabeller:
         print(f"✓ Board {board_idx} labels saved!")
         return True
     
-    def run_auto_labelling(self, total_boards=74, training_boards_num=None):
+    def run_auto_labelling(self, total_boards=74, training_boards_num=None, min_boards_for_training=2):
         """Main workflow - automatically uses all boards already in labels file
         
         Args:
             total_boards: Total number of boards to label
             training_boards_num: Optional - randomly sample this many boards for training (for debugging)
                                 If None, uses all labeled boards. Example: training_boards_num=5
+            min_boards_for_training: Minimum number of boards needed before training (default: 2)
         """
         print("=== Auto-Labelling Workflow ===")
         
@@ -366,37 +436,85 @@ class AutoLabeller:
         existing_labeled = self.get_manually_labeled_boards()
         print(f"\nCurrently labeled boards: {existing_labeled}")
         
-        # Verify we have enough training data
-        if len(self.labels) < 2:
-            print("\nError: Need at least 2 manually labeled boards to train.")
-            print("Please manually label more boards first.")
-            return
-        
-        print(f"\n✓ {len(self.labels)} boards available for training")
-        
         # Store training_boards_num for use in retraining
         self.training_boards_num = training_boards_num
         
-        # Train model
-        self.train_model(num_epochs=_SETTINGS["training"]["initial_epochs"], training_boards_num=training_boards_num)
+        # Check if we have enough boards to train
+        has_model = (self.model_dir / "tile_classifier.pth").exists()
+        can_train = len(self.labels) >= min_boards_for_training
         
-        # Auto-label remaining boards with review
-        print("\n=== Starting Auto-Labelling with Human Review ===")
+        if not can_train:
+            print(f"\n⚠️  Only {len(self.labels)} board(s) labeled. Need at least {min_boards_for_training} to train.")
+            print("Opening manual labeling mode...")
+            
+            # Manual labeling until we have enough boards
+            for board_idx in range(1, total_boards + 1):
+                if str(board_idx) not in self.labels:
+                    # Manual labeling with no predictions
+                    accepted = self.review_and_correct_board(board_idx, predictions=None)
+                    
+                    if not accepted:
+                        print("Labeling cancelled by user.")
+                        return
+                    
+                    # Check if we now have enough boards
+                    if len(self.labels) >= min_boards_for_training:
+                        print(f"\n✓ {len(self.labels)} boards labeled!")
+                        
+                        # Ask if user wants to train now
+                        if self._show_training_prompt():
+                            print("\n=== Training Initial Model ===")
+                            self.train_model(num_epochs=_SETTINGS["training"]["initial_epochs"], 
+                                           training_boards_num=training_boards_num)
+                            has_model = True
+                            break
+                        else:
+                            print("Training skipped. Continuing manual labeling...")
+                            can_train = False
+                            continue
+        else:
+            print(f"\n✓ {len(self.labels)} boards available for training")
+            
+            # Train model if we don't have one yet
+            if not has_model:
+                print("\n=== Training Initial Model ===")
+                self.train_model(num_epochs=_SETTINGS["training"]["initial_epochs"], 
+                               training_boards_num=training_boards_num)
+                has_model = True
+        
+        # Continue labeling remaining boards
+        print("\n=== Starting Labelling Workflow ===")
         new_labels_count = 0
         retrain_interval = _SETTINGS["training"]["retrain_interval"]
         
         for board_idx in range(1, total_boards + 1):
             if str(board_idx) not in self.labels:
-                accepted = self.review_and_correct_board(board_idx)
+                # Use predictions if we have a model, otherwise manual labeling
+                if has_model:
+                    board, predictions = self.predict_board(board_idx)
+                    accepted = self.review_and_correct_board(board_idx, predictions=predictions)
+                else:
+                    accepted = self.review_and_correct_board(board_idx, predictions=None)
+                
+                if not accepted:
+                    print("Labeling cancelled by user.")
+                    break
+                
                 new_labels_count += 1
                 
-                # Check if we"re done BEFORE retraining
+                # Check if we're done BEFORE retraining
                 boards_remaining = total_boards - int(board_idx)
                 
-                # Retrain every N new boards (but skip if we"re done)
-                if new_labels_count % retrain_interval == 0 and boards_remaining > 0:
-                    print(f"\n--- Retraining with new data (every {retrain_interval} boards) ---")
-                    self.train_model(num_epochs=_SETTINGS["training"]["retrain_epochs"], training_boards_num=training_boards_num)
+                # Retrain every N new boards (but skip if we're done or don't have a model yet)
+                if has_model and new_labels_count % retrain_interval == 0 and boards_remaining > 0:
+                    # Ask user if they want to retrain
+                    should_retrain, epochs = self._show_retrain_prompt()
+                    
+                    if should_retrain:
+                        print(f"\n--- Retraining with {epochs} epochs ---")
+                        self.train_model(num_epochs=epochs, training_boards_num=training_boards_num)
+                    else:
+                        print("Retraining skipped. Continuing with current model...")
         
         print(f"\n✓✓✓ All {total_boards} boards labeled! ✓✓✓")
         print(f"Labels saved to: {self.labels_file}")
