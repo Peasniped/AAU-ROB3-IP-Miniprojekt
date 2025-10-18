@@ -22,11 +22,11 @@ class CTkGUILabeller:
         self.max_crowns = max_crowns
         
         # Load settings
-        settings_path = Path(__file__).parent.parent.parent / 'settings.json'
-        with open(settings_path, 'r') as f:
+        settings_path = Path(__file__).parent.parent.parent / "settings.json"
+        with open(settings_path, "r") as f:
             settings = json.load(f)
-        self.board_width = settings['board']['width']
-        self.board_height = settings['board']['height']
+        self.board_width = settings["board"]["width"]
+        self.board_height = settings["board"]["height"]
         
         self.selected_tile = None  # Changed from set to single tile
         self.corrections = {}
@@ -73,7 +73,7 @@ class CTkGUILabeller:
             left_container,
             width=self.board.image.shape[1],
             height=self.board.image.shape[0],
-            bg='#1a1a1a',
+            bg="#1a1a1a",
             highlightthickness=0
         )
         self.canvas.pack(pady=(0, 10))
@@ -90,7 +90,7 @@ class CTkGUILabeller:
         ).pack(anchor="w", padx=15, pady=(10, 5))
         
         instructions_text = (
-            "> Click tiles to select/deselect\n"
+            "> Click a tile to select/deselect\n"
             "> Colors:\n"
             ">> Orange = Selected\n"
             ">> Purple = Corrected\n"
@@ -136,28 +136,39 @@ class CTkGUILabeller:
         
         ctk.CTkLabel(
             preview_frame,
-            text="🔍 Tile Preview",
+            text="Tile Preview",
             font=ctk.CTkFont(size=15, weight="bold")
         ).grid(row=0, column=0, sticky="w", padx=15, pady=(12, 8))
+        
+        # Tile title (above preview) - centered and bold
+        self.preview_title = ctk.CTkLabel(
+            preview_frame,
+            text="",
+            font=ctk.CTkFont(size=12, weight="bold"),
+            justify="center"
+        )
+        self.preview_title.grid(row=1, column=0, padx=15, pady=(0, 4))
         
         # Preview label - 75% of original size (210x210 instead of 280x280)
         self.preview_label = ctk.CTkLabel(
             preview_frame,
             text="Click a tile",
+            font=ctk.CTkFont(size=12),
             width=210,
             height=210,
             corner_radius=8,
             fg_color="#2b2b2b"
         )
-        self.preview_label.grid(row=1, column=0, padx=15, pady=(0, 8))
+        self.preview_label.grid(row=2, column=0, padx=15, pady=(0, 4))
         
+        # Info below preview - centered
         self.preview_info = ctk.CTkLabel(
             preview_frame,
             text="",
             font=ctk.CTkFont(size=11),
-            justify="left"
+            justify="center"
         )
-        self.preview_info.grid(row=2, column=0, sticky="w", padx=15, pady=(0, 12))
+        self.preview_info.grid(row=3, column=0, padx=15, pady=(0, 12))
         
         # Correction form
         correction_frame = ctk.CTkFrame(right_frame, corner_radius=10)
@@ -166,7 +177,7 @@ class CTkGUILabeller:
         
         ctk.CTkLabel(
             correction_frame,
-            text="✏️ Correct Selected Tiles",
+            text="Correct Selected Tile",
             font=ctk.CTkFont(size=15, weight="bold")
         ).grid(row=0, column=0, columnspan=2, sticky="w", padx=15, pady=(12, 8))
         
@@ -239,13 +250,13 @@ class CTkGUILabeller:
         
         ctk.CTkButton(
             buttons_frame,
-            text="✓ Accept All Predictions",
+            text="✓ Save all board labels",
             command=self._accept_all,
             font=ctk.CTkFont(size=14, weight="bold"),
             height=42,
             corner_radius=8,
-            fg_color="#4ec9b0",
-            hover_color="#3da88f"
+            fg_color="#4ebb53",
+            hover_color="#36e73f"
         ).grid(row=0, column=0, sticky="ew", pady=(0, 8))
         
         ctk.CTkButton(
@@ -272,8 +283,8 @@ class CTkGUILabeller:
         tile_width = vis_image.shape[1] // self.board_width
         
         for tile_idx, pred in self.predictions.items():
-            col = pred['col']
-            row = pred['row']
+            col = pred["col"]
+            row = pred["row"]
             
             x1 = col * tile_width
             y1 = row * tile_height
@@ -290,7 +301,7 @@ class CTkGUILabeller:
                 color = COLORS["purple"] # Corrected tiles
             else:
                 # Color based on confidence
-                conf = min(pred['tile_class_conf'], pred['crown_count_conf'])
+                conf = min(pred["tile_class_conf"], pred["crown_count_conf"])
                 if conf >= 0.9:
                     color = COLORS["green"]  # High confidence
                 elif conf >= 0.7:
@@ -303,11 +314,11 @@ class CTkGUILabeller:
             
             # Get current class/crown
             if tile_idx in self.corrections:
-                tile_class = self.corrections[tile_idx]['tile_class']
-                crown_count = self.corrections[tile_idx]['crown_count']
+                tile_class = self.corrections[tile_idx]["tile_class"]
+                crown_count = self.corrections[tile_idx]["crown_count"]
             else:
-                tile_class = pred['tile_class']
-                crown_count = pred['crown_count']
+                tile_class = pred["tile_class"]
+                crown_count = pred["crown_count"]
             
             # Force crown count to 0 for None (8), Crown (6), and Castle (7) tiles
             if tile_class in [6, 7, 8]:
@@ -385,7 +396,7 @@ class CTkGUILabeller:
         
         if 0 <= col < self.board_width and 0 <= row < self.board_height:
             for tile_idx, pred in self.predictions.items():
-                if pred['col'] == col and pred['row'] == row:
+                if pred["col"] == col and pred["row"] == row:
                     # Single selection - toggle or select new tile
                     if self.selected_tile == tile_idx:
                         self.selected_tile = None  # Deselect if clicking same tile
@@ -426,22 +437,24 @@ class CTkGUILabeller:
         # Convert to CTkImage
         ctk_image = ctk.CTkImage(light_image=pil_tile, dark_image=pil_tile, size=(210, 210))
         
-        # Store reference first, then configure to avoid TclError
-        self.preview_label.image = ctk_image
+        # Store reference to prevent garbage collection
+        self.preview_image_ref = ctk_image
         self.preview_label.configure(image=ctk_image, text="")
         
         # Show info
         if tile_idx in self.corrections:
-            tile_class = self.corrections[tile_idx]['tile_class']
-            crown_count = self.corrections[tile_idx]['crown_count']
-            info_text = f"Tile {tile_idx} (CORRECTED)\n{self.tile_classes[tile_class]}\n{crown_count} crowns"
+            tile_class = self.corrections[tile_idx]["tile_class"]
+            crown_count = self.corrections[tile_idx]["crown_count"]
+            title_text = f"Tile {tile_idx} (Corrected)"
+            info_text = f"{self.tile_classes[tile_class]}\n{crown_count} crowns"
         else:
-            tile_class = pred['tile_class']
-            crown_count = pred['crown_count']
-            info_text = (f"Tile {tile_idx} (Predicted)\n"
-                        f"{self.tile_classes[tile_class]} ({pred['tile_class_conf']:.1%})\n"
-                        f"{crown_count} crowns ({pred['crown_count_conf']:.1%})")
+            tile_class = pred["tile_class"]
+            crown_count = pred["crown_count"]
+            title_text = f"Tile {tile_idx} (Predicted)"
+            info_text = (f"{self.tile_classes[tile_class]} ({pred["tile_class_conf"]:.1%})\n"
+                        f"{crown_count} crowns ({pred["crown_count_conf"]:.1%})")
         
+        self.preview_title.configure(text=title_text)
         self.preview_info.configure(text=info_text)
         
         # Pre-fill correction form
@@ -453,16 +466,17 @@ class CTkGUILabeller:
         """Clear the tile preview when no tile is selected"""
         self.current_preview_tile = None
         
-        # Create a blank placeholder image
-        blank_image = Image.new('RGB', (210, 210), color='#2b2b2b')
+        # Create a blank image to avoid TclError
+        blank_image = Image.new("RGB", (210, 210), color="#2b2b2b")
         blank_ctk_image = ctk.CTkImage(light_image=blank_image, dark_image=blank_image, size=(210, 210))
         
-        # Update the preview with blank image and text
-        self.preview_label.image = blank_ctk_image
-        self.preview_label.configure(image=blank_ctk_image, text="")
+        # Set blank image and text
+        self.preview_image_ref = blank_ctk_image
+        self.preview_label.configure(image=blank_ctk_image, text="Click a tile")
         
-        # Clear info text
-        self.preview_info.configure(text="Click a tile to preview")
+        # Clear the title and info text
+        self.preview_title.configure(text="")
+        self.preview_info.configure(text="")
         
         # Reset correction form to defaults
         self.class_combo.set("")
@@ -478,7 +492,7 @@ class CTkGUILabeller:
         if not class_str:
             return
         
-        tile_class = int(class_str.split(':')[0])
+        tile_class = int(class_str.split(":")[0])
         crown_count = self.crown_var.get()
         
         # Force crown count to 0 for None (8), Crown (6), and Castle (7) tiles
@@ -488,10 +502,10 @@ class CTkGUILabeller:
         
         pred = self.predictions[self.selected_tile]
         self.corrections[self.selected_tile] = {
-            'tile_class': tile_class,
-            'crown_count': crown_count,
-            'col': pred['col'],
-            'row': pred['row']
+            "tile_class": tile_class,
+            "crown_count": crown_count,
+            "col": pred["col"],
+            "row": pred["row"]
         }
         
         print(f"✓ Corrected tile {self.selected_tile} to: {self.tile_classes[tile_class]}, {crown_count} crown(s)")
@@ -516,10 +530,10 @@ class CTkGUILabeller:
                 final_labels[str(tile_idx)] = self.corrections[tile_idx]
             else:
                 final_labels[str(tile_idx)] = {
-                    'tile_class': pred['tile_class'],
-                    'crown_count': pred['crown_count'],
-                    'col': pred['col'],
-                    'row': pred['row']
+                    "tile_class": pred["tile_class"],
+                    "crown_count": pred["crown_count"],
+                    "col": pred["col"],
+                    "row": pred["row"]
                 }
         
         self.result = final_labels

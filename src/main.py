@@ -1,7 +1,7 @@
 import cv2
 import torch
 
-from board import Board
+from components.board import Board
 
 if __name__ == "__main__":
     print(f"PyTorch version: {torch.__version__}")

@@ -13,8 +13,8 @@ from multitask_classifier import MultiTaskTileClassifier
 from train.ctk_gui_labeller import CTkGUILabeller
 
 # Load settings
-_settings_path = Path(__file__).parent.parent.parent / 'settings.json'
-with open(_settings_path, 'r') as f:
+_settings_path = Path(__file__).parent.parent.parent / "settings.json"
+with open(_settings_path, "r") as f:
     _SETTINGS = json.load(f)
 
 class TileDataset(Dataset):
@@ -27,43 +27,43 @@ class TileDataset(Dataset):
     
     def __getitem__(self, idx):
         tile_data = self.tiles_data[idx]
-        image = Image.fromarray(tile_data['image'][:, :, ::-1])  # BGR to RGB
+        image = Image.fromarray(tile_data["image"][:, :, ::-1])  # BGR to RGB
         
         if self.transform:
             image = self.transform(image)
         
         return {
-            'image': image,
-            'tile_class': tile_data['tile_class'],
-            'crown_count': tile_data['crown_count'],
-            'board_idx': tile_data['board_idx'],
-            'tile_idx': tile_data['tile_idx']
+            "image": image,
+            "tile_class": tile_data["tile_class"],
+            "crown_count": tile_data["crown_count"],
+            "board_idx": tile_data["board_idx"],
+            "tile_idx": tile_data["tile_idx"]
         }
 
 class AutoLabeller:
     def __init__(self, save_dir=None, model_dir=None, labels_file=None, classes_file=None):
         # Load from settings if not provided
-        self.model_dir = Path(model_dir) if model_dir else Path(_SETTINGS['paths']['model_dir'])
+        self.model_dir = Path(model_dir) if model_dir else Path(_SETTINGS["paths"]["model_dir"])
         self.model_dir.mkdir(exist_ok=True, parents=True)
         
         # Load labels file
-        self.labels_file = Path(labels_file) if labels_file else Path(_SETTINGS['paths']['labels_file'])
+        self.labels_file = Path(labels_file) if labels_file else Path(_SETTINGS["paths"]["labels_file"])
         self.labels = self._load_labels()
         
         # Load tile classes from file
-        classes_path = classes_file if classes_file else _SETTINGS['paths']['classes_file']
+        classes_path = classes_file if classes_file else _SETTINGS["paths"]["classes_file"]
         self.tile_classes = self._load_classes(classes_path)
         self.num_classes = len(self.tile_classes)
-        self.max_crowns = _SETTINGS['model']['max_crowns']
+        self.max_crowns = _SETTINGS["model"]["max_crowns"]
         
-        self.board_width = _SETTINGS['board']['width']
-        self.board_height = _SETTINGS['board']['height']
+        self.board_width = _SETTINGS["board"]["width"]
+        self.board_height = _SETTINGS["board"]["height"]
         
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model = None
         
         # Use settings for image size, or default to 224 for EfficientNet
-        image_size = _SETTINGS['model'].get('image_size', 224)
+        image_size = _SETTINGS["model"].get("image_size", 224)
         self.transform = transforms.Compose([
             transforms.Resize((image_size, image_size)),
             transforms.ToTensor(),
@@ -73,7 +73,7 @@ class AutoLabeller:
     def _load_labels(self):
         """Load existing labels from JSON file"""
         if self.labels_file.exists():
-            with open(self.labels_file, 'r') as f:
+            with open(self.labels_file, "r") as f:
                 return json.load(f)
         return {}
     
@@ -82,11 +82,11 @@ class AutoLabeller:
         classes_path = Path(classes_file)
         if not classes_path.exists():
             print(f"Warning: {classes_file} not found, using default classes")
-            return ['Meadow', 'Woods', 'Farmland', 'Desert', 'Mine', 'Ocean', 'Crown', 'Castle', 'None']
+            return ["Meadow", "Woods", "Farmland", "Desert", "Mine", "Ocean", "Crown", "Castle", "None"]
         
-        with open(classes_path, 'r') as f:
+        with open(classes_path, "r") as f:
             data = json.load(f)
-            classes_data = data.get('classes', [])
+            classes_data = data.get("classes", [])
             
             # Handle both list format and dict format
             if isinstance(classes_data, dict):
@@ -100,7 +100,7 @@ class AutoLabeller:
     
     def _save_labels(self):
         """Save labels to JSON file"""
-        with open(self.labels_file, 'w') as f:
+        with open(self.labels_file, "w") as f:
             json.dump(self.labels, f, indent=2)
     
     def get_manually_labeled_boards(self):
@@ -144,10 +144,10 @@ class AutoLabeller:
             
             # Store label
             board_labels[str(tile.index)] = {
-                'tile_class': tile_class,
-                'crown_count': crown_count,
-                'col': tile.col,
-                'row': tile.row
+                "tile_class": tile_class,
+                "crown_count": crown_count,
+                "col": tile.col,
+                "row": tile.row
             }
             
             print(f"✓ Labeled as: {self.tile_classes[tile_class]}, {crown_count} crown(s)")
@@ -165,9 +165,9 @@ class AutoLabeller:
             training_boards_num: Optional - randomly sample this many boards for training (for debugging)
         """
         if num_epochs is None:
-            num_epochs = _SETTINGS['training']['initial_epochs']
+            num_epochs = _SETTINGS["training"]["initial_epochs"]
         if batch_size is None:
-            batch_size = _SETTINGS['training']['batch_size']
+            batch_size = _SETTINGS["training"]["batch_size"]
         
         print("\n=== Training Model ===")
         
@@ -186,11 +186,11 @@ class AutoLabeller:
             for tile_idx, label in board_labels.items():
                 tile = board.get_tile_from_index(int(tile_idx))
                 tiles_data.append({
-                    'image': tile.image,
-                    'tile_class': label['tile_class'],
-                    'crown_count': label['crown_count'],
-                    'board_idx': int(board_idx),
-                    'tile_idx': int(tile_idx)
+                    "image": tile.image,
+                    "tile_class": label["tile_class"],
+                    "crown_count": label["crown_count"],
+                    "board_idx": int(board_idx),
+                    "tile_idx": int(tile_idx)
                 })
         
         print(f"Training on {len(tiles_data)} tiles from {len(boards_to_train)} boards")
@@ -206,7 +206,7 @@ class AutoLabeller:
         # Loss functions and optimizer
         criterion_class = nn.CrossEntropyLoss()
         criterion_crown = nn.CrossEntropyLoss()
-        optimizer = optim.Adam(self.model.parameters(), lr=_SETTINGS['training']['learning_rate'])
+        optimizer = optim.Adam(self.model.parameters(), lr=_SETTINGS["training"]["learning_rate"])
         
         # Training loop
         for epoch in range(num_epochs):
@@ -217,9 +217,9 @@ class AutoLabeller:
             total_samples = 0
             
             for batch in dataloader:
-                images = batch['image'].to(self.device)
-                tile_classes = batch['tile_class'].to(self.device)
-                crown_counts = batch['crown_count'].to(self.device)
+                images = batch["image"].to(self.device)
+                tile_classes = batch["tile_class"].to(self.device)
+                crown_counts = batch["crown_count"].to(self.device)
                 
                 optimizer.zero_grad()
                 
@@ -249,14 +249,14 @@ class AutoLabeller:
                   f"Class Acc: {class_acc:.2f}% - Crown Acc: {crown_acc:.2f}%")
         
         # Save model
-        model_path = self.model_dir / 'tile_classifier.pth'
+        model_path = self.model_dir / "tile_classifier.pth"
         torch.save(self.model.state_dict(), model_path)
         print(f"\n✓ Model saved to {model_path}")
     
     def predict_board(self, board_idx):
         """Predict labels for a board using trained model"""
         if self.model is None:
-            model_path = self.model_dir / 'tile_classifier.pth'
+            model_path = self.model_dir / "tile_classifier.pth"
             if not model_path.exists():
                 raise ValueError("No trained model found. Please train first.")
             
@@ -284,12 +284,12 @@ class AutoLabeller:
                 crown_conf, crown_pred = torch.max(crown_probs, 1)
                 
                 predictions[tile.index] = {
-                    'tile_class': class_pred.item(),
-                    'tile_class_conf': class_conf.item(),
-                    'crown_count': crown_pred.item(),
-                    'crown_count_conf': crown_conf.item(),
-                    'col': tile.col,
-                    'row': tile.row
+                    "tile_class": class_pred.item(),
+                    "tile_class_conf": class_conf.item(),
+                    "crown_count": crown_pred.item(),
+                    "crown_count_conf": crown_conf.item(),
+                    "col": tile.col,
+                    "row": tile.row
                 }
         
         return board, predictions
@@ -301,8 +301,8 @@ class AutoLabeller:
         tile_width = vis_image.shape[1] // self.board_width
         
         for tile_idx, pred in predictions.items():
-            col = pred['col']
-            row = pred['row']
+            col = pred["col"]
+            row = pred["row"]
             
             # Calculate tile boundaries
             x1 = col * tile_width
@@ -311,7 +311,7 @@ class AutoLabeller:
             y2 = (row + 1) * tile_height
             
             # Color based on confidence (green = high, yellow = medium, red = low)
-            conf = min(pred['tile_class_conf'], pred['crown_count_conf'])
+            conf = min(pred["tile_class_conf"], pred["crown_count_conf"])
             if conf > 0.8:
                 color = (0, 255, 0)  # Green
             elif conf > 0.5:
@@ -323,8 +323,8 @@ class AutoLabeller:
             cv2.rectangle(vis_image, (x1, y1), (x2, y2), color, 3)
             
             # Add text
-            class_name = self.tile_classes[pred['tile_class']]
-            text = f"{class_name[:3]} C{pred['crown_count']}"
+            class_name = self.tile_classes[pred["tile_class"]]
+            text = f"{class_name[:3]} C{pred["crown_count"]}"
             cv2.putText(vis_image, text, (x1+5, y1+20), 
                        cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
         
@@ -378,25 +378,25 @@ class AutoLabeller:
         self.training_boards_num = training_boards_num
         
         # Train model
-        self.train_model(num_epochs=_SETTINGS['training']['initial_epochs'], training_boards_num=training_boards_num)
+        self.train_model(num_epochs=_SETTINGS["training"]["initial_epochs"], training_boards_num=training_boards_num)
         
         # Auto-label remaining boards with review
         print("\n=== Starting Auto-Labelling with Human Review ===")
         new_labels_count = 0
-        retrain_interval = _SETTINGS['training']['retrain_interval']
+        retrain_interval = _SETTINGS["training"]["retrain_interval"]
         
         for board_idx in range(1, total_boards + 1):
             if str(board_idx) not in self.labels:
                 accepted = self.review_and_correct_board(board_idx)
                 new_labels_count += 1
                 
-                # Check if we're done BEFORE retraining
+                # Check if we"re done BEFORE retraining
                 boards_remaining = total_boards - int(board_idx)
                 
-                # Retrain every N new boards (but skip if we're done)
+                # Retrain every N new boards (but skip if we"re done)
                 if new_labels_count % retrain_interval == 0 and boards_remaining > 0:
                     print(f"\n--- Retraining with new data (every {retrain_interval} boards) ---")
-                    self.train_model(num_epochs=_SETTINGS['training']['retrain_epochs'], training_boards_num=training_boards_num)
+                    self.train_model(num_epochs=_SETTINGS["training"]["retrain_epochs"], training_boards_num=training_boards_num)
         
         print(f"\n✓✓✓ All {total_boards} boards labeled! ✓✓✓")
         print(f"Labels saved to: {self.labels_file}")
