@@ -10,7 +10,10 @@ if __name__ == "__main__":
     print(f"CUDA available: {torch.cuda.is_available()}")
     
     if torch.cuda.is_available():
-        print(f"GPU: {torch.cuda._get_device(0)}")
+        properties = torch.cuda.get_device_properties(0)
+        name = torch.cuda.get_device_name(0)
+        ram = properties.total_memory / (1024 ** 2) # Convert to MB
+        print(f"GPU: {torch.cuda._get_device(0)} - {name} - {ram:.0f} MB")
 
     file = Path("src/board_labels.json")
     if file.exists():    
@@ -54,6 +57,26 @@ if __name__ == "__main__":
     # Start auto-labelling workflow
     labeller = AutoLabeller(labels_file="src/board_labels.json")
     
-    # Run auto-labelling - with Human In The Loop (HITL)
-    #labeller.run_auto_labelling(total_boards=40)
-    labeller.run_auto_labelling(total_boards=40, training_boards_num=1)
+    # Ask user what they want to do
+    print("\n=== Labeling Options ===")
+    print("1. Continue labeling unlabeled boards")
+    print("2. Review and edit already labeled boards")
+    print("3. Both (review labeled boards first, then continue with unlabeled)")
+    
+    while True:
+        choice = input("\nEnter your choice (1/2/3): ").strip()
+        if choice in ["1", "2", "3"]:
+            break
+        print("Invalid choice. Please enter 1, 2, or 3.")
+    
+    if choice == "2":
+        # Review already labeled boards only
+        labeller.review_labeled_boards()
+    elif choice == "3":
+        # Review labeled boards first, then continue with unlabeled
+        labeller.review_labeled_boards()
+        print("\n=== Now continuing with unlabeled boards ===")
+        labeller.run_auto_labelling(total_boards=40, training_boards_num=1)
+    else:
+        # Default: Continue labeling unlabeled boards
+        labeller.run_auto_labelling(total_boards=40, training_boards_num=1)

@@ -711,14 +711,15 @@ class CTkGUILabeller:
     def _cleanup_and_close(self):
         """Properly cleanup resources before closing"""
         try:
-            # Cancel any pending after callbacks
-            for after_id in self.root.tk.call('after', 'info'):
-                self.root.after_cancel(after_id)
+            # Just quit and destroy - simpler is better
+            self.root.quit()
         except:
-            pass  # Ignore errors during cleanup
+            pass
         
-        self.root.quit()
-        self.root.destroy()
+        try:
+            self.root.destroy()
+        except:
+            pass
     
     def _on_window_close(self):
         """Handle window close button (X) - prompt user to confirm exit"""

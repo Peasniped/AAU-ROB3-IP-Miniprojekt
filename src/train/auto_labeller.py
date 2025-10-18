@@ -13,6 +13,7 @@ from multitask_classifier import MultiTaskTileClassifier
 from train.ctk_gui_labeller import CTkGUILabeller
 import tkinter as tk
 from tkinter import messagebox
+import time
 
 # Load settings
 _settings_path = Path(__file__).parent.parent.parent / "settings.json"
@@ -389,7 +390,9 @@ class AutoLabeller:
             board_idx: Index of the board to review
             predictions: Optional predictions dict. If None, opens GUI for manual labeling
         """
-        print(f"\n=== {'Reviewing' if predictions else 'Manually Labeling'} Board {board_idx} ===")
+        # Only print header if not in review mode (predictions will have confidence 1.0 if reviewing)
+        if predictions is None or (predictions and any(pred.get("tile_class_conf", 0) < 1.0 for pred in predictions.values())):
+            print(f"\n=== {'Reviewing' if predictions else 'Manually Labeling'} Board {board_idx} ===")
         
         board = Board(int(board_idx))
         
@@ -420,6 +423,102 @@ class AutoLabeller:
         self._save_labels()
         print(f"✓ Board {board_idx} labels saved!")
         return True
+    
+    def review_labeled_boards(self):
+        """Review and edit already labeled boards"""
+        labeled_boards = self.get_manually_labeled_boards()
+        
+        if len(labeled_boards) == 0:
+            print("\n⚠️  No labeled boards found to review.")
+            return
+        
+        print(f"\n=== Reviewing {len(labeled_boards)} Labeled Boards ===")
+        print(f"Labeled boards: {labeled_boards}")
+        
+        # Ask which boards to review
+        print("\nOptions:")
+        print("1. Review all labeled boards")
+        print("2. Review specific board(s)")
+        
+        while True:
+            choice = input("\nEnter your choice (1/2): ").strip()
+            if choice in ["1", "2"]:
+                break
+            print("Invalid choice. Please enter 1 or 2.")
+        
+        boards_to_review = []
+        
+        if choice == "1":
+            # Review all labeled boards
+            boards_to_review = labeled_boards
+        else:
+            # Review specific boards
+            print(f"\nAvailable boards: {labeled_boards}")
+            while True:
+                board_input = input("Enter board number(s) to review (comma-separated, or 'done' to finish): ").strip()
+                
+                if board_input.lower() == 'done':
+                    break
+                
+                try:
+                    # Parse comma-separated board numbers
+                    requested_boards = [int(b.strip()) for b in board_input.split(',')]
+                    
+                    # Validate that boards are labeled
+                    for board_idx in requested_boards:
+                        if board_idx in labeled_boards:
+                            if board_idx not in boards_to_review:
+                                boards_to_review.append(board_idx)
+                                print(f"✓ Added board {board_idx} to review list")
+                        else:
+                            print(f"⚠️  Board {board_idx} is not labeled yet")
+                    
+                except ValueError:
+                    print("Invalid input. Please enter board numbers separated by commas.")
+            
+            if len(boards_to_review) == 0:
+                print("No boards selected for review.")
+                return
+            
+            boards_to_review = sorted(boards_to_review)
+        
+        # Review selected boards
+        print(f"\n=== Starting Review of {len(boards_to_review)} Board(s) ===")
+        
+        for board_idx in boards_to_review:
+            print(f"\n--- Reviewing Board {board_idx} ---")
+            
+            # Load existing labels as predictions
+            board = Board(int(board_idx))
+            existing_labels = self.labels[str(board_idx)]
+            
+            # Convert existing labels to prediction format
+            predictions = {}
+            for tile_idx, label in existing_labels.items():
+                predictions[int(tile_idx)] = {
+                    "tile_class": label["tile_class"],
+                    "tile_class_conf": 1.0,  # Show as high confidence (it's already labeled)
+                    "crown_count": label["crown_count"],
+                    "crown_count_conf": 1.0,
+                    "col": label["col"],
+                    "row": label["row"]
+                }
+            
+            # Open GUI for review
+            accepted = self.review_and_correct_board(board_idx, predictions=predictions)
+            
+            # Small delay to allow proper cleanup before next window
+            time.sleep(0.2)
+            
+            if not accepted:
+                print(f"Skipped board {board_idx}")
+                # Ask if user wants to continue
+                continue_review = input("Continue reviewing remaining boards? (y/n): ").strip().lower()
+                if continue_review != 'y':
+                    print("Review stopped.")
+                    break
+        
+        print(f"\n✓ Review complete!")
     
     def run_auto_labelling(self, total_boards=74, training_boards_num=None, min_boards_for_training=2):
         """Main workflow - automatically uses all boards already in labels file
