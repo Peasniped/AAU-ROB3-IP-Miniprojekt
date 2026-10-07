@@ -1,5 +1,4 @@
 from pathlib import Path
-import cv2
 import torch
 import json
 
@@ -79,4 +78,4 @@ if __name__ == "__main__":
         labeller.run_auto_labelling(total_boards=40, training_boards_num=1)
     else:
         # Default: Continue labeling unlabeled boards
-        labeller.run_auto_labelling(total_boards=40, training_boards_num=1)
+        labeller.run_auto_labelling(total_boards=74, force_train=True)

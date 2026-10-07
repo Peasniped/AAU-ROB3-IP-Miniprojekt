@@ -6,15 +6,15 @@ from pathlib import Path
 from components.tile import Tile
 
 # Load settings
-_settings_path = Path(__file__).parent.parent.parent / 'settings.json'
-with open(_settings_path, 'r') as f:
+_settings_path = Path(__file__).parent.parent.parent / "settings.json"
+with open(_settings_path, "r") as f:
     _settings = json.load(f)
 
 class Board:
 
     def __init__(self, index:int):
         self.index: int = index
-        base_path = _settings['board']['base_file_path'].replace('/', '\\')
+        base_path = _settings["board"]["base_file_path"].replace("/", "\\")
         self.file_name: str = f"{base_path}\\{index}.jpg"
         self.image: np.ndarray = cv2.imread(self.file_name)
         self.image_hsv: np.ndarray = cv2.cvtColor(self.image, cv2.COLOR_BGR2HSV)
@@ -22,11 +22,11 @@ class Board:
         self.tiles = self._cut_into_tiles()
 
     def _cut_into_tiles(self) -> list[Tile]:
-        board_width = _settings['board']['width']
-        board_height = _settings['board']['height']
+        board_width = _settings["board"]["width"]
+        board_height = _settings["board"]["height"]
         tile_height = self.image.shape[0] // board_width
         tile_width = self.image.shape[1] // board_width
-        margin = _settings['board']['tile_margin']
+        margin = _settings["board"]["tile_margin"]
 
         tiles = []
         index = 0

@@ -9,7 +9,7 @@
     "batch_size": 32,
     "initial_epochs": 30,
     "retrain_epochs": 10,
-    "retrain_interval": 10,
+    "retrain_interval": 5,
     "learning_rate": 0.001
   },
   "model": {

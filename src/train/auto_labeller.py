@@ -292,8 +292,8 @@ class AutoLabeller:
         result = messagebox.askyesnocancel(
             "Training Epochs",
             f"Choose training duration:\n\n"
-            f"YES = Full training ({_SETTINGS['training']['retrain_epochs']} epochs)\n"
-            f"NO = Quick training ({_SETTINGS['training']['retrain_epochs'] // 2} epochs)\n"
+            f"YES = Full training ({_SETTINGS["training"]["retrain_epochs"]} epochs)\n"
+            f"NO = Quick training ({_SETTINGS["training"]["retrain_epochs"] // 2} epochs)\n"
             f"CANCEL = Skip retraining"
         )
         
@@ -302,9 +302,9 @@ class AutoLabeller:
         if result is None:  # Cancel
             return False, 0
         elif result:  # Yes - full epochs
-            return True, _SETTINGS['training']['retrain_epochs']
+            return True, _SETTINGS["training"]["retrain_epochs"]
         else:  # No - reduced epochs
-            return True, max(1, _SETTINGS['training']['retrain_epochs'] // 2)
+            return True, max(1, _SETTINGS["training"]["retrain_epochs"] // 2)
     
     def predict_board(self, board_idx):
         """Predict labels for a board using trained model"""
@@ -392,7 +392,7 @@ class AutoLabeller:
         """
         # Only print header if not in review mode (predictions will have confidence 1.0 if reviewing)
         if predictions is None or (predictions and any(pred.get("tile_class_conf", 0) < 1.0 for pred in predictions.values())):
-            print(f"\n=== {'Reviewing' if predictions else 'Manually Labeling'} Board {board_idx} ===")
+            print(f"\n=== {"Reviewing" if predictions else "Manually Labeling"} Board {board_idx} ===")
         
         board = Board(int(board_idx))
         
@@ -457,12 +457,12 @@ class AutoLabeller:
             while True:
                 board_input = input("Enter board number(s) to review (comma-separated, or 'done' to finish): ").strip()
                 
-                if board_input.lower() == 'done':
+                if board_input.lower() == "done":
                     break
                 
                 try:
                     # Parse comma-separated board numbers
-                    requested_boards = [int(b.strip()) for b in board_input.split(',')]
+                    requested_boards = [int(b.strip()) for b in board_input.split(",")]
                     
                     # Validate that boards are labeled
                     for board_idx in requested_boards:
@@ -514,13 +514,13 @@ class AutoLabeller:
                 print(f"Skipped board {board_idx}")
                 # Ask if user wants to continue
                 continue_review = input("Continue reviewing remaining boards? (y/n): ").strip().lower()
-                if continue_review != 'y':
+                if continue_review != "y":
                     print("Review stopped.")
                     break
         
         print(f"\n✓ Review complete!")
     
-    def run_auto_labelling(self, total_boards=74, training_boards_num=None, min_boards_for_training=2):
+    def run_auto_labelling(self, total_boards=74, training_boards_num=None, min_boards_for_training=2, force_train=False):
         """Main workflow - automatically uses all boards already in labels file
         
         Args:
@@ -575,7 +575,7 @@ class AutoLabeller:
             print(f"\n✓ {len(self.labels)} boards available for training")
             
             # Train model if we don't have one yet
-            if not has_model:
+            if not has_model or force_train:
                 print("\n=== Training Initial Model ===")
                 self.train_model(num_epochs=_SETTINGS["training"]["initial_epochs"], 
                                training_boards_num=training_boards_num)
@@ -604,7 +604,7 @@ class AutoLabeller:
                 # Check if we're done BEFORE retraining
                 boards_remaining = total_boards - int(board_idx)
                 
-                # Retrain every N new boards (but skip if we're done or don't have a model yet)
+                # Retrain every N new boards (but skip if we"re done or don"t have a model yet)
                 if has_model and new_labels_count % retrain_interval == 0 and boards_remaining > 0:
                     # Ask user if they want to retrain
                     should_retrain, epochs = self._show_retrain_prompt()
